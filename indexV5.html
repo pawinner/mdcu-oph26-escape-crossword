@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Lab Terminal: mRNA Sequence</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --cell: 40px;
+            --mrna-color: #f39c12;
+            --bg: #d1d1d1;
+            --font-main: 'Lexend', sans-serif;
+        }
+        body { font-family: 'Lexend', monospace; background: var(--bg); display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .grid { display: grid; grid-template-columns: 100px repeat(12, var(--cell)) 100px; background: #bbb; gap: 1px; border: 2px solid #444; }
+        .cell { width: var(--cell); height: var(--cell); background: white; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 1px solid #ccc; box-sizing: border-box; }
+        .cell input { font-family: var(--font-main); width: 100%; height: 100%; border: none; text-align: center; font-size: 1.2rem; font-weight: bold; text-transform: uppercase; outline: none; background: transparent; }
+        
+        /* Normal state for mRNA row (looks like a normal box) */
+        .mrna-row { background: white; }
+        .empty { background: transparent; }
+        .hint { background: #eeeeee !important; color: #397fd6; font-size: 1.2rem; pointer-events: none; user-select: none; }
+        .label { background: #eee; font-size: 1.1rem; border: none; }
+        
+        /* Hidden labels initially */
+        .end-cap { 
+            opacity: 0; 
+            transition: opacity 1s ease;
+            background: var(--mrna-color); 
+            font-size: 0.9rem; 
+            font-weight: bold; 
+            color: black; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            text-align: center; 
+            padding: 2px; 
+        }
+        
+        /* --- Line ~40: Success Animation --- */
+.solved .mrna-row { 
+    /* 3 blinks total (0.5s x 3 = 1.5s) */
+    animation: blinkEffect 0.5s ease-in-out 3 forwards; 
+}
+
+@keyframes blinkEffect {
+    0%, 100% { background: white; color: black; }
+    50% { background: var(--mrna-color); color: white; }
+    /* The final state must be the orange color */
+    100% { background: var(--mrna-color); color: white; }
+}
+
+/* Ensure the side labels only fade in AFTER the 3 blinks are done */
+.solved .end-cap { 
+    opacity: 1; 
+    transition: opacity 0.5s ease 1.5s; 
+}
+
+/* Ensure hints in the mRNA row also turn white during/after animation */
+.solved .mrna-row.hint {
+    animation: blinkText 0.5s ease-in-out 3 forwards;
+}
+
+@keyframes blinkText {
+    0%, 100% { color: #444; }
+    50%, 100% { color: white; }
+}
+        
+        .controls { margin-top: 20px; display: flex; gap: 20px; align-items: center; }
+        #status { font-weight: bold; font-size: 1.2rem; color: #333; }
+        .btn-reset { padding: 8px 16px; cursor: pointer; background: #444; color: white; border: none; border-radius: 4px; font-family: inherit; }
+    </style>
+</head>
+<body>
+
+<audio id="successSound" src="https://www.soundjay.com/buttons/sounds/beep-06.wav"></audio>
+
+<div class="grid" id="grid"></div>
+
+<div class="controls">
+    <div id="status">ANALYZING GENETIC SAMPLES...</div>
+    <button class="btn-reset" onclick="resetPuzzle()">RESET</button>
+    <button id="debugBtn" class="btn-reset" style="background: #27ae60;" onclick="fillDebug()">DEV: FILL</button>
+</div>
+
+<script>
+    const WORDS = [
+        "PHAGOCYTOSIS", "IMMUNOLOGY", "G", "CHLOROPLAST", 
+        "TACHYCARDIA", "U", "HYPERGLYCEMIA", "A", 
+        "MACROPHAGE", "PNEUMONIA", "A", "ANTIBODY"
+    ];
+
+    const MRNA_INDEX = 5; 
+    const OFFSETS = [2, 3, 0, 0, 1, 0, 5, 0, 2, 3, 0, 0];
+
+    const RAW_HINTS = [
+        [0,0,'P'], [0,1,'H'], [0,2,'A'], [0,3,'G'], [0,4,'O'], [0,5,'C'], [0,6,'Y'], [0,7,'T'], [0,8,'O'], [0,9,'S'], [0,10,'I'], [0,11,'S'], // Phagocytosis
+        [1,0,'I'], [1,4,'N'], [1,6,'L'], [1,8,'G'], // Immunology
+        [2,0,'G'],
+        [3,1,'H'], [3,3,'O'], [3,5,'O'], [3,10,'T'], // Chloroplast (matching your photo's specific gaps)
+        [4,0,'T'], [4,3,'H'], [4,5,'C'], [4,6,'A'], [4,7,'R'], [4,10,'A'], // Tachycardia
+        [5,0,'U'],
+        [6,0,'H'], [6,1,'Y'], [6,2,'P'], [6,3,'E'], [6,4,'R'], [6,5,'G'], [6,6,'L'], [6,7,'Y'], [6,8,'C'], [6,9,'E'], [6,10,'M'], [6,11,'I'], [6,12,'A'], // Hyperglycemia
+        [7,0,'A'],
+        [8,0,'M'], [8,1,'A'], [8,3,'R'], [8,5,'P'], [8,9,'E'], // Macrophage
+        [9,0,'P'], [9,1,'N'], [9,6,'N'], [9,8,'A'], // Pneumonia
+        [10,0,'A'],
+        [11,1,'N'], [11,3,'I'], [11,5,'O'], [11,7,'Y'] // Antibody
+    ];
+
+    const grid = document.getElementById('grid');
+
+    function buildGrid() {
+        grid.innerHTML = "";
+        grid.innerHTML += `<div class="empty"></div>`;
+        for(let i=1; i<=12; i++) grid.innerHTML += `<div class="cell label">${i}</div>`;
+        grid.innerHTML += `<div class="empty"></div>`;
+
+        for (let r = 0; r < 18; r++) {
+            grid.innerHTML += (r === MRNA_INDEX) ? `<div class="end-cap">mRNA 5' end</div>` : `<div class="empty"></div>`;
+            for (let c = 0; c < 12; c++) {
+                const startRow = MRNA_INDEX - OFFSETS[c];
+                const charPos = r - startRow;
+                if (charPos >= 0 && charPos < WORDS[c].length) {
+                    const isMrna = (r === MRNA_INDEX);
+                    const hintFound = RAW_HINTS.find(h => h[0] === c && h[1] === charPos);
+                    // --- Line ~98: Inside buildGrid loop ---
+                    let cellClass = isMrna ? "cell mrna-row" : "cell";
+                    if (hintFound) {
+                    // Add 'mrna-row' class even if it is a hint so it blinks too
+                    let hintClass = isMrna ? "cell mrna-row hint" : "cell hint";
+                    grid.innerHTML += `<div class="${hintClass}">${hintFound[2]}</div>`;
+                    } else {
+                    grid.innerHTML += `<div class="${cellClass}"><input type="text" maxlength="1" data-word="${c}" data-idx="${charPos}" oninput="checkPuzzle()"></div>`;
+                    }
+                } else {
+                    grid.innerHTML += `<div class="empty"></div>`;
+                }
+            }
+            grid.innerHTML += (r === MRNA_INDEX) ? `<div class="end-cap">mRNA 3' end</div>` : `<div class="empty"></div>`;
+        }
+    }
+
+    // --- Line ~125: checkPuzzle Function ---
+    function checkPuzzle() {
+        const inputs = document.querySelectorAll('input');
+        let isComplete = true;
+        inputs.forEach(inp => {
+            if (inp.value.toUpperCase() !== WORDS[inp.dataset.word][inp.dataset.idx]) isComplete = false;
+        });
+
+        if (isComplete) {
+            document.body.classList.add('solved');
+            document.getElementById('status').innerText = "SEQUENCE REVEALED: AUG CAU GAC UAA";
+            if (!hasPlayed) {
+                document.getElementById('successSound').play();
+                hasPlayed = true;
+            }
+        } else {
+            // This removes the solved state instantly if a letter is changed/deleted
+            document.body.classList.remove('solved');
+            document.getElementById('status').innerText = "ANALYZING GENETIC SAMPLES...";
+            hasPlayed = false;
+        }
+    }
+
+    function fillDebug() {
+        const inputs = document.querySelectorAll('input');
+        inputs.forEach(inp => {
+            const w = parseInt(inp.dataset.word);
+            const i = parseInt(inp.dataset.idx);
+            
+            // Fill everything EXCEPT the letter 'Y' in 'ANTIBODY' (Word 11, Index 7)
+            if (!(w === 11 && i === 6)) {
+                inp.value = WORDS[w][i];
+            }
+        });
+        checkPuzzle(); // Refresh the state
+    }
+
+    function resetPuzzle() {
+        if(confirm("Clear all inputs?")) 
+            hasPlayed = false;
+            document.body.classList.remove('solved');
+            document.getElementById('status').innerText = "ANALYZING GENETIC SAMPLES...";
+            buildGrid();
+        }
+    
+
+    buildGrid();
+</script>
+</body>
+</html>

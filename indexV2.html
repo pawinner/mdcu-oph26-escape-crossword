@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Lab Terminal: mRNA Sequence</title>
+    <style>
+        :root {
+            --cell: 40px;
+            --mrna-color: #f39c12;
+            --bg: #fdfdfd;
+        }
+        body { font-family: 'Courier New', monospace; background: #d1d1d1; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .grid { display: grid; grid-template-columns: 100px repeat(12, var(--cell)) 100px; background: #bbb; gap: 1px; border: 2px solid #444; }
+        .cell { width: var(--cell); height: var(--cell); background: white; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .cell input { width: 100%; height: 100%; border: none; text-align: center; font-size: 1.1rem; font-weight: bold; text-transform: uppercase; outline: none; background: transparent; }
+        .mrna-row { background: #fff1dc; }
+        .empty { background: transparent; }
+        .hint { background: #eeeeee !important; color: #444; pointer-events: none; user-select: none; }
+        .label { background: #eee; font-size: 0.8rem; border: none; }
+        .end-cap { background: var(--mrna-color); font-size: 0.8rem; font-weight: bold; color: black; display: flex; align-items: center; justify-content: center; text-align: center; padding: 2px; }
+        
+        /* Success Animation */
+        .solved .mrna-row { background: var(--mrna-color) !important; color: white; transition: background 0.8s ease; }
+        .solved .mrna-row input { color: white; }
+        #status { margin-top: 20px; font-weight: bold; font-size: 1.2rem; color: #333; }
+    </style>
+</head>
+<body>
+
+<div class="grid" id="grid"></div>
+<div id="status">ANALYZING GENETIC SAMPLES...</div>
+
+<script>
+    const WORDS = [
+        "PHAGOCYTOSIS", "IMMUNOLOGY", "G", "CHLOROPLAST", 
+        "TACHYCARDIA", "U", "HYPERGLYCEMIA", "A", 
+        "MACROPHAGE", "PNEUMONIA", "A", "ANTIBODY"
+    ];
+
+    // Aligning the secret letters (A, U, G, C, A, U, G, A, C, U, A, A) to Row 5
+    const MRNA_INDEX = 5; 
+    const OFFSETS = [2, 3, 0, 0, 1, 0, 5, 0, 2, 3, 0, 0];
+
+    // Exact hints from your reference image
+    // Format: [ColumnIndex, RowIndexRelativeInWord, Letter]
+    const RAW_HINTS = [
+        [0,0,'P'], [0,1,'H'], [0,6,'G'], [0,7,'O'], [0,8,'C'], [0,9,'Y'], [0,10,'T'], [0,11,'O'], [0,12,'S'], [0,13,'I'], [0,14,'S'], // Phagocytosis
+        [1,1,'I'], [1,6,'N'], [1,8,'L'], [1,10,'G'], // Immunology
+        [3,6,'H'], [3,8,'O'], [3,10,'O'], // Chloroplast (matching your photo's specific gaps)
+        [4,4,'T'], [4,7,'H'], [4,9,'C'], [4,10,'A'], [4,11,'R'], [4,15,'A'], [4,16,'T'], // Tachycardia
+        [6,0,'H'], [6,1,'Y'], [6,2,'P'], [6,3,'E'], [6,4,'R'], [6,6,'L'], [6,7,'Y'], [6,8,'C'], [6,9,'E'], [6,10,'M'], [6,11,'I'], [6,12,'A'], // Hyperglycemia
+        [8,3,'M'], [8,4,'A'], [8,6,'R'], [8,8,'P'], [8,12,'E'], // Macrophage
+        [9,2,'P'], [9,3,'N'], [9,8,'N'], [9,10,'A'], // Pneumonia
+        [11,6,'N'], [11,8,'I'], [11,10,'O'], [11,12,'Y'] // Antibody
+    ];
+
+    const grid = document.getElementById('grid');
+
+    // Header Numbers
+    grid.innerHTML += `<div class="empty"></div>`;
+    for(let i=1; i<=12; i++) grid.innerHTML += `<div class="cell label">${i}</div>`;
+    grid.innerHTML += `<div class="empty"></div>`;
+
+    // Render 18 rows to cover the full length of Tachycardia/Phagocytosis
+    for (let r = 0; r < 18; r++) {
+        // Left Side
+        grid.innerHTML += (r === MRNA_INDEX) ? `<div class="end-cap">mRNA 5' end</div>` : `<div class="empty"></div>`;
+
+        for (let c = 0; c < 12; c++) {
+            const startRow = MRNA_INDEX - OFFSETS[c];
+            const charPos = r - startRow;
+
+            if (charPos >= 0 && charPos < WORDS[c].length) {
+                const isMrna = (r === MRNA_INDEX);
+                const hintFound = RAW_HINTS.find(h => h[0] === c && h[1] === charPos);
+                
+                let cellClass = isMrna ? "cell mrna-row" : "cell";
+                if (hintFound) {
+                    grid.innerHTML += `<div class="${cellClass} hint">${hintFound[2]}</div>`;
+                } else {
+                    grid.innerHTML += `<div class="${cellClass}"><input type="text" maxlength="1" data-word="${c}" data-idx="${charPos}"></div>`;
+                }
+            } else {
+                grid.innerHTML += `<div class="empty"></div>`;
+            }
+        }
+
+        // Right Side
+        grid.innerHTML += (r === MRNA_INDEX) ? `<div class="end-cap">mRNA 3' end</div>` : `<div class="empty"></div>`;
+    }
+
+    // Checking Logic
+    document.addEventListener('input', (e) => {
+        const inputs = document.querySelectorAll('input');
+        let isComplete = true;
+
+        inputs.forEach(inp => {
+            const w = inp.dataset.word;
+            const i = inp.dataset.idx;
+            if (inp.value.toUpperCase() !== WORDS[w][i]) isComplete = false;
+        });
+
+        if (isComplete) {
+            document.body.classList.add('solved');
+            document.getElementById('status').innerText = "SEQUENCE REVEALED: A U G C A U G A C U A A";
+            document.getElementById('status').style.color = "#d35400";
+        }
+    });
+</script>
+</body>
+</html>
