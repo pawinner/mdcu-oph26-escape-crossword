@@ -79,7 +79,7 @@
 </head>
 <body>
 
-<audio id="successSound" src="assets/sounds/BGT Break.mp3"></audio>
+<audio id="successSound" src="assets/sounds/BGT Break.mp3" preload="auto"></audio>
 
 <div class="grid" id="grid"></div>
 
@@ -147,6 +147,7 @@
     }
 
     let hasPlayed = false;
+    const SOUND_START_TIME = 0.5; // seconds (change this value to adjust start point)
 
     function checkPuzzle() {
         const inputs = document.querySelectorAll('input');
@@ -161,7 +162,9 @@
             
             // ADD THESE LINES TO PLAY SOUND
             if (!hasPlayed) {
-                document.getElementById('successSound').play();
+                const audio = document.getElementById('successSound');
+                audio.currentTime = SOUND_START_TIME;
+                audio.play();
                 hasPlayed = true;
             }
         } else {
